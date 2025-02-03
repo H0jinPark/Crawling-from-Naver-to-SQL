@@ -10,7 +10,7 @@ import re
 import pandas as pd
 from datetime import datetime
 from tqdm import tqdm
-
+from naver_collect_image import download_images
 
 
 # # URL에서 dirID 값을 가져오는 함수
@@ -149,6 +149,9 @@ def Crawling_to_CSV():
         url = urls[i]
         try:
             collect_information(url, Q_df, A_df)
+            # 대찬이형이 만든 이미지 크롤링 코드 추가
+            download_images(url)
+
         except:
             print(f"질문자가 질문을 삭제했습니다. - {url}")
 
