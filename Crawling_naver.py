@@ -57,31 +57,32 @@ def collect_information(url, Q_df, A_df):
         Q_date = Q_date.replace("작성일", "")
     ans = []
     A_dates = []
+    user_ids = []
     try:
         answers = soup.find_all(class_='se-main-container')
         ans_date = soup.find_all(class_='answerDate')
+        user_id = soup.find_all('strong', class_='name')
         for answer in answers:
             ans.append(answer.get_text(strip=True).replace('\u200b', ''))
         for ans_dates in ans_date:
             A_dates.append(ans_dates.get_text(strip=True))
+        for id in user_id:  
+            user_ids.append(id.get_text(strip=True))
     except:
         answer_error = "아직 답변이 없습니다"
-    
     ID = get_dirid(url)
     doc_ID = get_docid(url)
-    Q_inf_list =[get_docid(url), title, Q_detail, ID, Q_view, Q_date]
     A_inf_list =[]
     n = 1
-    for i,j in zip(ans,A_dates):
-        changed = i.replace(","," ")
-        if j.endswith(" 전"):
+
+    for i in range(len(ans)):
+        changed = ans[i].replace(","," ")
+        if A_dates[i].endswith(" 전"):
             today = datetime.today().strftime('%Y.%m.%d.')
-            A_inf_list.append([doc_ID, doc_ID+str(n), changed[2:],today])
+            A_inf_list.append([doc_ID, doc_ID+str(n), user_ids[i], changed[:],today])
         else:
-            A_inf_list.append([doc_ID, doc_ID+str(n), changed[2:],j])
+            A_inf_list.append([doc_ID, doc_ID+str(n), user_ids[i], changed[:],A_dates[i]])
         n += 1
-    Q_df.loc[Q_df.shape[0]] = Q_inf_list
-    
     for i in A_inf_list:
         A_df.loc[A_df.shape[0]] = i
     return Q_df, A_df
@@ -91,6 +92,7 @@ def collect_information(url, Q_df, A_df):
 # 질문 목록에서 URL만 가져기기
 
 def get_url_from_list(search_url, urls):
+    import time
     response = requests.get(search_url) 
     
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -100,6 +102,7 @@ def get_url_from_list(search_url, urls):
     for element in elements[1:]:
         href = "https://kin.naver.com"+element.get('href')
         urls.append(href)
+    time.sleep(1)
     return urls
 
 
@@ -115,8 +118,29 @@ def collect_urls(region, Today):
             urls= get_url_from_list(page, urls)
     except:
         pass
+    print(len(urls))
     return urls
 
+def url_maker(urls):
+    import time
+    url2 = 'https://kin.naver.com/qna/list.naver?dirId=12'
+    headers2 = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+    current_date = datetime.now()
+    Today = current_date.strftime("%Y-%m-%d")
+
+    loc_dict = pd.read_csv("naver_kin_regions_df_l2.csv", index_col = "지역 코드")
+    local_lists = loc_dict.index.tolist()
+
+    # # 11월 06일 기준 전체 지역 URL 크롤링(매핑테이블의 index를 사용) -> 현재 지역&플레이스에 나와있는 모든 질문 url을 수집
+    for region in tqdm(local_lists, desc="Processing URLs", ncols=100, leave=True):
+        region_urls = collect_urls(region, Today)  # 반환값 저장
+        time.sleep(1)
+        urls.extend(region_urls)  # 반환된 URL을 urls에 추가
+    
+    print("총 질문 개수:"+str(len(urls)))
+    return urls
 
 def Crawling_to_CSV():
     
@@ -125,32 +149,22 @@ def Crawling_to_CSV():
     headers2 = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
-    # 오늘 날짜 가져오기
-    current_date = datetime.now()
-    Today = current_date.strftime("%Y-%m-%d")
-    
     # 데이터프레임 선언
-    Q_df = pd.DataFrame(columns = ['문서 번호', '제목',  '질문',  "위치 고유번호" , '조회수', '질문 날짜'])
-    A_df = pd.DataFrame(columns = ['문서 번호', '답변 ID',  '답변', '답변 날짜'])
-    loc_dict = pd.read_csv("naver_kin_regions_df_l2.csv", index_col = "지역 코드")
-    local_lists = loc_dict.index.tolist()
 
-    # # 11월 06일 기준 전체 지역 URL 크롤링(매핑테이블의 index를 사용) -> 현재 지역&플레이스에 나와있는 모든 질문 url을 수집
+    Q_df = pd.DataFrame(columns = ['문서 번호', '제목',  '질문',  "위치 고유번호" , '조회수', '질문 날짜'])
+    A_df = pd.DataFrame(columns = ['문서 번호', '답변 ID','사용자 ID', '답변', '답변 날짜'])    
+    # 오늘 날짜 가져오기
     urls = [] # 혹시 모르니 초기화
-    for region in tqdm(local_lists, desc="Processing URLs", ncols=100, leave=True):
-        region_urls = collect_urls(region, Today)  # 반환값 저장
-        urls.extend(region_urls)  # 반환된 URL을 urls에 추가
-    
+    urls = url_maker(urls)
+
     # # 실제 데이터 불러오기(매핑 테이블 추후 SQL에서 join 예정)
     # ## 45분 정도 소요
-
     for i in tqdm(range(len(urls)), desc="Processing URLs", ncols=100, leave=True):
         url = urls[i]
         try:
             collect_information(url, Q_df, A_df)
-            # 대찬이형이 만든 이미지 크롤링 코드 추가
-            download_images(url)
+            # # 대찬이형이 만든 이미지 크롤링 코드 추가
+            # download_images(url)
 
         except:
             print(f"질문자가 질문을 삭제했습니다. - {url}")

@@ -72,5 +72,5 @@ def download_images(url):
     driver.quit()
 
 #  실행 예제 (네이버 지식iN URL 입력)
-url = "https://kin.naver.com/qna/detail.naver?d1id=12&dirId=1205&docId=481218973"  # 원하는 링크로 변경
-download_images(url)
+# url = "https://kin.naver.com/qna/detail.naver?d1id=12&dirId=1205&docId=481218973"  # 원하는 링크로 변경
+# download_images(url)
