@@ -42,6 +42,8 @@ def collect_information(url, Q_df, A_df):
 
     # BeautifulSoup으로 페이지 파싱
     soup = BeautifulSoup(response.text, 'html.parser')
+    ID = get_dirid(url)
+    doc_ID = get_docid(url)
 
     # 질문 제목 추출
     title = soup.find(attrs={'class': 'endTitleSection'}).get_text(strip=True)
@@ -55,6 +57,7 @@ def collect_information(url, Q_df, A_df):
         Q_date = datetime.today().strftime('%Y.%m.%d')
     if Q_date.startswith("작성일"):
         Q_date = Q_date.replace("작성일", "")
+    Q_df.loc[Q_df.shape[0]] = [doc_ID, title,  Q_detail,  ID , Q_view, Q_date]
     ans = []
     A_dates = []
     user_ids = []
@@ -70,8 +73,7 @@ def collect_information(url, Q_df, A_df):
             user_ids.append(id.get_text(strip=True))
     except:
         answer_error = "아직 답변이 없습니다"
-    ID = get_dirid(url)
-    doc_ID = get_docid(url)
+    
     A_inf_list =[]
     n = 1
 
